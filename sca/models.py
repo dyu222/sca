@@ -19,7 +19,7 @@ import torch.nn.functional as F
 import geotorch
 
 from sca.util import torchify
-from sca.loss_funcs import my_loss, my_loss_norm
+from sca.loss_funcs import my_loss, my_loss_norm, my_loss_norm_poiss
 from sca.architectures import LowROrth, LowRNorm
 
 from tqdm import tqdm
@@ -410,7 +410,7 @@ class SCA(object):
     """
 
 
-    def __init__(self,n_components=None,lam_sparse=None,lr=None,n_epochs=3000,orth=False,lam_orthog=None,init=None,scheduler_params_input=dict()):
+    def __init__(self,n_components=None,lam_sparse=None,lr=None,n_epochs=3000,orth=False,lam_orthog=None,init=None,scheduler_params_input=dict(),poisson=False):
 
          self.n_components = n_components
          self.lam_sparse=lam_sparse
@@ -420,6 +420,7 @@ class SCA(object):
          self.orth=orth
          self.init=init
          self.scheduler_params_input=scheduler_params_input
+         self.poisson = poisson
 
 
     def fit_transform(self,X,Y=None,sample_weight=None):
@@ -559,10 +560,13 @@ class SCA(object):
         #Get initial model loss before training
         model.eval()
         latent, y_pred = model(X_torch)
-        if self.orth:
-            before_train = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
+        if self.poisson:
+            before_train = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
         else:
-            before_train = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
+            if self.orth:
+                before_train = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
+            else:
+                before_train = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
 
         #Fit the model!
 
@@ -576,10 +580,13 @@ class SCA(object):
             # Forward pass
             latent, y_pred = model(X_torch)
             # Compute Loss
-            if self.orth:
-                loss = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
+            if self.poisson:
+                loss = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
             else:
-                loss = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
+                if self.orth:
+                    loss = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
+                else:
+                    loss = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
             losses[epoch+1]=loss.item()
 
             # Backward pass

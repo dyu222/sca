@@ -132,5 +132,6 @@ class LowRNorm(nn.Module):
         """
 
         hidden = self.fc1(x)
-        output = self.fc2(hidden)
+        # output = self.fc2(hidden)
+        output = torch.nn.functional.softplus(self.fc2(hidden)) #soft plus torch.softplus
         return hidden, output
