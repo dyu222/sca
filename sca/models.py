@@ -24,6 +24,8 @@ from sca.architectures import LowROrth, LowRNorm
 
 from tqdm import tqdm
 
+import math
+
 
 
 ############ Functions for initialization
@@ -560,6 +562,11 @@ class SCA(object):
         #Get initial model loss before training
         model.eval()
         latent, y_pred = model(X_torch)
+
+        diff = len(Y_torch) - len(y_pred)
+        adj_idxs = range(diff//2, len(Y_torch) - math.ceil(diff/2))
+        Y_torch = Y_torch[adj_idxs]
+        
         if self.poisson:
             before_train = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
         else:
@@ -605,6 +612,9 @@ class SCA(object):
         self.params['b_u']=model.fc1.bias.detach().numpy()
         self.params['V']=model.fc2.weight.detach().numpy().T
         self.params['b_v']=model.fc2.bias.detach().numpy()
+
+        Y = Y[adj_idxs]
+        sample_weight = sample_weight[adj_idxs]
 
         self.r2_score=r2_score(Y,y_pred.detach().numpy(),sample_weight=sample_weight,multioutput='variance_weighted')
         self.reconstruction_loss=np.sum((sample_weight*(y_pred.detach().numpy() - Y))**2)
