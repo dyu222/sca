@@ -1,5 +1,6 @@
 import torch
 from torch.special import gammaln
+import math
 
 def my_loss(output, target, latent, lam_sparse, sample_weight):
 
@@ -61,7 +62,7 @@ def my_loss_norm(output, target, latent, V, lam_sparse, lam_orthog, sample_weigh
 
 
 
-def my_loss_norm_poiss(pred_frs, spikes, latent, V, lam_sparse, lam_orthog, sample_weight):
+def my_loss_norm_poiss(pred_frs, spikes, latent, V, lam_sparse, lam_orthog, sample_weight, loss_sigmas, lam_loss):
 
     """
     Loss function when using orthogonality penalty instead of constraint
@@ -81,20 +82,25 @@ def my_loss_norm_poiss(pred_frs, spikes, latent, V, lam_sparse, lam_orthog, samp
     sample_weight: weighting of each sample
         torch 2d tensor of size [n_time, 1]
 
-
+    
     Returns
     -------
     loss: the value of the cost function, a scalar
     """
     term1 = -torch.sum(-gammaln(spikes+1)-pred_frs+spikes*torch.log(pred_frs+1e-8))
-    '''
-    poisson only defined over !positive!(or non negative) numbers- probability that we'll generate a certain number of spikes
-    "soft plus" to end during the forwarding of model possibly 
-    - clamping data? maybe not preferred but a possibility
-    - centered data over 0 as mean- causing issues with negative values
-    '''
     term2 = lam_sparse*torch.sum(torch.abs(latent))
     term3 = lam_orthog*torch.norm(V.T@V-torch.eye(V.shape[1]))**2
-    # print("v shape: ", V.shape) #[50,8]
-    # print(term1, term2, term3)
-    return term1 + term2 + term3
+    loss_sigmas2 = 1+torch.nn.functional.softplus(loss_sigmas)
+    # term4 = lam_loss*torch.sum(0.5 * (latent[1:]-latent[:-1])**2 / (loss_sigmas**2) + torch.log(loss_sigmas)) # sum over one axis when diff sigma for each latent
+    term4 = lam_loss*torch.sum(0.5 * (latent[1:]-latent[:-1])**2 / (loss_sigmas2**2) + torch.log(loss_sigmas2)) # sum over one axis when diff sigma for each latent
+
+    # show term 4 for each latent. find the stdev of these values -> initial estimate for loss sigma
+    # add lambda smoothness if term4 is much larger than the other 3 terms- dont want it to dominate - prefer not to need this
+    # print("term1: ", term1, "term2: ", term2, "term3: ", term3, "term4: ", term4)
+
+    return term1 + term2 + term3 + term4
+# to learn, might just pass in the sigma to the function and define it in the model
+# can rename them to loss_sigma, etc
+
+# if statement if the magnitude changes by 100x, add a breakpoint - giant spike in loss curve
+# find the iteration it happens at and then rerun it that many times to analyze

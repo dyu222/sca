@@ -118,12 +118,15 @@ class LowRNorm(nn.Module):
 
         self._x_vals = torch.arange(-10,11,1)
         
+        
         # TODO: learned sigmas, currently we give it a default
-
         # self.sigmas = torch.nn.Parameter(torch.ones((
         #     n_regions,
         #     self.n_components
         # )))
+        
+        self.sigmas = torch.nn.Parameter(torch.ones(hidden_size))
+        self.loss_sigmas = torch.nn.Parameter(torch.ones(hidden_size)) #add the loss sigmas as torch w size len hidden size in the model
     
     def _gauss(self, x, mu, sig):
         return torch.exp(-0.5*((x-mu)/sig)**2)
@@ -136,8 +139,9 @@ class LowRNorm(nn.Module):
             self._gauss(
                 self._x_vals,
                 0,
-                # stddev[j]).reshape(1,1,-1)
-                1).reshape(1,1,-1)
+                # 1).reshape(1,1,-1)
+                self.sigmas[j]).reshape(1,1,-1)
+                # 1+torch.nn.functional.softplus(self.sigmas[j])).reshape(1,1,-1)
             for j in range(self.hidden_size)
         ]
         return filt_bank
@@ -170,7 +174,6 @@ class LowRNorm(nn.Module):
         f = self._make_filters()
         z_post_filter = self.apply_filters(f, z_pre_filter)
         X_hat = self.fc2(z_post_filter)
-        # X_hat = torch.nn.functional.relu(X_hat)
         X_hat_pos = torch.nn.functional.softplus(X_hat)
         return z_pre_filter, X_hat_pos
 

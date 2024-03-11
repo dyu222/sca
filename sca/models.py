@@ -412,7 +412,7 @@ class SCA(object):
     """
 
 
-    def __init__(self,n_components=None,lam_sparse=None,lr=None,n_epochs=3000,orth=False,lam_orthog=None,init=None,scheduler_params_input=dict(),poisson=False):
+    def __init__(self,n_components=None,lam_sparse=None,lr=None,n_epochs=3000,orth=False,lam_orthog=None,init=None,scheduler_params_input=dict(),poisson=False, lam_loss=1):
 
          self.n_components = n_components
          self.lam_sparse=lam_sparse
@@ -423,6 +423,7 @@ class SCA(object):
          self.init=init
          self.scheduler_params_input=scheduler_params_input
          self.poisson = poisson
+         self.lam_loss = lam_loss
 
 
     def fit_transform(self,X,Y=None,sample_weight=None):
@@ -568,7 +569,7 @@ class SCA(object):
         Y_torch = Y_torch[adj_idxs]
         
         if self.poisson:
-            before_train = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
+            before_train = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
         else:
             if self.orth:
                 before_train = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
@@ -588,7 +589,7 @@ class SCA(object):
             latent, y_pred = model(X_torch)
             # Compute Loss
             if self.poisson:
-                loss = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
+                loss = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
             else:
                 if self.orth:
                     loss = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
@@ -602,7 +603,8 @@ class SCA(object):
             if self.scheduler_params['use_scheduler']:
                 scheduler.step(loss.item())
         # print('time',time.time()-t1)
-
+        print("final sigmas: ", model.sigmas)
+        print("final loss sigmas: ", model.loss_sigmas)
         # Include attributes as part of self
         self.model=model
         self.losses=losses
