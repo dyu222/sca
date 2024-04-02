@@ -93,14 +93,6 @@ def my_loss_norm_poiss(pred_frs, spikes, latent, V, lam_sparse, lam_orthog, samp
     loss_sigmas2 = 1+torch.nn.functional.softplus(loss_sigmas)
     # term4 = lam_loss*torch.sum(0.5 * (latent[1:]-latent[:-1])**2 / (loss_sigmas**2) + torch.log(loss_sigmas)) # sum over one axis when diff sigma for each latent
     term4 = lam_loss*torch.sum(0.5 * (latent[1:]-latent[:-1])**2 / (loss_sigmas2**2) + torch.log(loss_sigmas2)) # sum over one axis when diff sigma for each latent
-
-    # show term 4 for each latent. find the stdev of these values -> initial estimate for loss sigma
-    # add lambda smoothness if term4 is much larger than the other 3 terms- dont want it to dominate - prefer not to need this
     # print("term1: ", term1, "term2: ", term2, "term3: ", term3, "term4: ", term4)
 
-    return term1 + term2 + term3 + term4
-# to learn, might just pass in the sigma to the function and define it in the model
-# can rename them to loss_sigma, etc
-
-# if statement if the magnitude changes by 100x, add a breakpoint - giant spike in loss curve
-# find the iteration it happens at and then rerun it that many times to analyze
+    return term1 + term2 + term3 # + term4

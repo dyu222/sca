@@ -112,6 +112,9 @@ class LowRNorm(nn.Module):
         self.fc1.weight = torch.nn.Parameter(torch.tensor(U_init, dtype=torch.float)) #Initialize U
         if input_size==output_size:
             self.fc1.bias = torch.nn.Parameter(torch.tensor(-U_init@b_init, dtype=torch.float)) #Initialize first layer bias
+        self.fc0 = nn.Linear(self.input_size, self.input_size, bias=True)
+        self.fc3 = nn.Linear(self.hidden_size, self.hidden_size, bias=True)
+        self.dropout = nn.Dropout(p=0.1)
 
         self.fc2 = P.register_parametrization(nn.Linear(self.hidden_size, self.output_size), "weight", Sphere(dim=0))
         self.fc2.bias  = torch.nn.Parameter(torch.tensor(b_init, dtype=torch.float)) #Initialize b
@@ -139,8 +142,8 @@ class LowRNorm(nn.Module):
             self._gauss(
                 self._x_vals,
                 0,
-                # 1).reshape(1,1,-1)
-                self.sigmas[j]).reshape(1,1,-1)
+                1).reshape(1,1,-1)
+                # self.sigmas[j]).reshape(1,1,-1)
                 # 1+torch.nn.functional.softplus(self.sigmas[j])).reshape(1,1,-1)
             for j in range(self.hidden_size)
         ]
@@ -169,7 +172,14 @@ class LowRNorm(nn.Module):
         hidden: the low-dimensional representations, of size [n_time, hidden_size]
         output: the predictions, of size [n_time, output_size]
         """
-        z_pre_filter = self.fc1(x)
+        # x = self.fc0(x)
+        # x = nn.functional.elu(x)
+        
+        x = self.dropout(x)
+        z_pre_filter = self.fc1(x) #define a dropout where fc1 is defined - before it is defined to dropout the inputs (within fc1)
+
+        # z_pre_filter = self.fc3(z_pre_filter)
+        # z_pre_filter = nn.functional.elu(z_pre_filter)
         
         f = self._make_filters()
         z_post_filter = self.apply_filters(f, z_pre_filter)
