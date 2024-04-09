@@ -22,6 +22,8 @@ from sca.util import torchify
 from sca.loss_funcs import my_loss, my_loss_norm, my_loss_norm_poiss
 from sca.architectures import LowROrth, LowRNorm
 
+from sca.dropout import CoordinatedDropout
+
 from tqdm import tqdm
 
 import math
@@ -582,11 +584,16 @@ class SCA(object):
         losses=np.zeros(self.n_epochs+1) #Save loss at each training epoch
         losses[0]=before_train.item()
 
+        cd_dropout = CoordinatedDropout(0.1)
+
         model.train()
         for epoch in tqdm(range(self.n_epochs), position=0, leave=True):
             optimizer.zero_grad()
             # Forward pass
-            latent, y_pred = model(X_torch)
+            X_dropout = cd_dropout.process_data(X_torch) # AT the end use the X_torch not dropout to show final latents w out dropout
+            # latent, y_pred = model(X_torch)
+            latent, y_pred = model(X_dropout)
+            
             # Compute Loss
             if self.poisson:
                 loss = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
@@ -595,6 +602,10 @@ class SCA(object):
                     loss = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
                 else:
                     loss = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
+            
+            #TODO: verify this is how to update the losses using the gradient thing and then use .reset after?
+            # loss = cd_dropout.process_losses(loss) # worry about this later.
+            cd_dropout.reset()
             losses[epoch+1]=loss.item()
 
             # Backward pass
@@ -602,12 +613,8 @@ class SCA(object):
             optimizer.step()
             if self.scheduler_params['use_scheduler']:
                 scheduler.step(loss.item())
-
-        '''
-        Rerun the model with 0 dropout - might need to add dropout as an argument
-        
-        '''
         # print('time',time.time()-t1)
+        latent, y_pred = model(X_torch)
         print("final sigmas: ", model.sigmas)
         print("final loss sigmas: ", model.loss_sigmas)
         # Include attributes as part of self

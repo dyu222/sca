@@ -7,7 +7,6 @@ import geotorch
 import numpy as np
 
 
-
 # Note - I would like to credit the pytorch tutorial, that the formatting of my functions is similar to:
 # https://medium.com/biaslyai/pytorch-introduction-to-neural-network-feedforward-neural-network-model-e7231cff47cb
 
@@ -175,7 +174,7 @@ class LowRNorm(nn.Module):
         # x = self.fc0(x)
         # x = nn.functional.elu(x)
         
-        x = self.dropout(x)
+        # x = self.dropout(x)
         z_pre_filter = self.fc1(x) #define a dropout where fc1 is defined - before it is defined to dropout the inputs (within fc1)
 
         # z_pre_filter = self.fc3(z_pre_filter)
