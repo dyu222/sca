@@ -141,8 +141,8 @@ class LowRNorm(nn.Module):
             self._gauss(
                 self._x_vals,
                 0,
-                1).reshape(1,1,-1)
-                # self.sigmas[j]).reshape(1,1,-1)
+                # 1).reshape(1,1,-1)
+                self.sigmas[j]).reshape(1,1,-1)
                 # 1+torch.nn.functional.softplus(self.sigmas[j])).reshape(1,1,-1)
             for j in range(self.hidden_size)
         ]
@@ -171,8 +171,8 @@ class LowRNorm(nn.Module):
         hidden: the low-dimensional representations, of size [n_time, hidden_size]
         output: the predictions, of size [n_time, output_size]
         """
-        # x = self.fc0(x)
-        # x = nn.functional.elu(x)
+        x = self.fc0(x)
+        x = nn.functional.elu(x)
         
         # x = self.dropout(x)
         z_pre_filter = self.fc1(x) #define a dropout where fc1 is defined - before it is defined to dropout the inputs (within fc1)

@@ -582,9 +582,13 @@ class SCA(object):
 
         # t1=time.time()
         losses=np.zeros(self.n_epochs+1) #Save loss at each training epoch
+        total_losses=np.zeros(self.n_epochs+1) #Save loss at each training epoch
+        # TODO: update the first one as well
+        dropout_rate = 0.15
         losses[0]=before_train.item()
+        total_losses[0]=before_train.item()
 
-        cd_dropout = CoordinatedDropout(0.1)
+        cd_dropout = CoordinatedDropout(dropout_rate)
 
         model.train()
         for epoch in tqdm(range(self.n_epochs), position=0, leave=True):
@@ -596,17 +600,27 @@ class SCA(object):
             
             # Compute Loss
             if self.poisson:
-                loss = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
+                # update Y_pred and Y_torch to be the the values of the held out latents
+                mask = cd_dropout.mask
+                mask = 1 - mask # we want to recover the withheld neurons - the ones that were zeroed before
+                mask = mask.bool()
+                # loss = my_loss_norm_poiss(y_pred[mask], Y_torch[mask], latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
+                loss = my_loss_norm_poiss(y_pred*mask, Y_torch*mask, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
+                # loss = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
+                # above is what will be put into optimizer 
+                # shape either timepoints by neurons or other way
+                # use y_pred[:,dropout_idxs] and for y_torch above - assuming time by neurons
+                # also keep track of total_losses
+                loss_total = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
             else:
                 if self.orth:
                     loss = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
                 else:
                     loss = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
             
-            #TODO: verify this is how to update the losses using the gradient thing and then use .reset after?
-            # loss = cd_dropout.process_losses(loss) # worry about this later.
             cd_dropout.reset()
             losses[epoch+1]=loss.item()
+            total_losses[epoch+1]=loss_total.item()
 
             # Backward pass
             loss.backward()
@@ -620,6 +634,7 @@ class SCA(object):
         # Include attributes as part of self
         self.model=model
         self.losses=losses
+        self.total_losses=total_losses #should generally go down but doesn't do much for the model- diagnostic, plot as well
 
         self.params={}
         self.params['U']=model.fc1.weight.detach().numpy().T
