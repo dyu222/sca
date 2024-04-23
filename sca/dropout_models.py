@@ -590,6 +590,8 @@ class SCA(object):
 
         cd_dropout = CoordinatedDropout(dropout_rate)
 
+        update_frequency = int(1/dropout_rate)
+
         model.train()
         for epoch in tqdm(range(self.n_epochs), position=0, leave=True):
             optimizer.zero_grad()
@@ -608,9 +610,6 @@ class SCA(object):
                 loss = my_loss_norm_poiss(y_pred*mask, Y_torch*mask, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
                 # loss = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
                 # above is what will be put into optimizer 
-                # shape either timepoints by neurons or other way
-                # use y_pred[:,dropout_idxs] and for y_torch above - assuming time by neurons
-                # also keep track of total_losses
                 loss_total = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
             else:
                 if self.orth:
@@ -624,7 +623,10 @@ class SCA(object):
 
             # Backward pass
             loss.backward()
-            optimizer.step()
+            # optimizer.step()
+            if (epoch+1) % update_frequency == 0 or epoch == self.n_epochs-1:
+                optimizer.step()
+                optimizer.zero_grad()
             if self.scheduler_params['use_scheduler']:
                 scheduler.step(loss.item())
         # print('time',time.time()-t1)

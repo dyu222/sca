@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# just some testing and notes not needed
+sca/DELETE_LATER.py
+sca/old_and_notes.py
