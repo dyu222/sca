@@ -24,6 +24,7 @@ from sca.architectures import LowROrth, LowRNorm
 
 from tqdm import tqdm
 
+from sca.dropout import CoordinatedDropout
 
 
 ############ Functions for initialization
@@ -568,19 +569,33 @@ class SCA(object):
 
         # t1=time.time()
         losses=np.zeros(self.n_epochs+1) #Save loss at each training epoch
+        total_losses=np.zeros(self.n_epochs+1) #Save loss at each training epoch
         losses[0]=before_train.item()
+        total_losses[0]=before_train.item()
+
+
+        dropout_rate = .15
+        cd_dropout = CoordinatedDropout(dropout_rate)
 
         model.train()
         for epoch in tqdm(range(self.n_epochs), position=0, leave=True):
             optimizer.zero_grad()
             # Forward pass
-            latent, y_pred = model(X_torch)
+            X_dropout = cd_dropout.process_data(X_torch)
+            latent, y_pred = model(X_dropout)
+            
+            mask = cd_dropout.mask
+            mask = 1 - mask # we want to recover the withheld neurons - the ones that were zeroed before
+            mask = mask.bool()
+
             # Compute Loss
             if self.orth:
                 loss = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
             else:
-                loss = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
+                loss = my_loss_norm(y_pred*mask, Y_torch*mask, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
+                loss_total = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
             losses[epoch+1]=loss.item()
+            total_losses[epoch+1]=loss.item()
 
             # Backward pass
             loss.backward()
@@ -590,8 +605,10 @@ class SCA(object):
         # print('time',time.time()-t1)
 
         # Include attributes as part of self
+        latent, y_pred = model(X_torch) # use original data for final prediction
         self.model=model
         self.losses=losses
+        self.total_losses=total_losses
 
         self.params={}
         self.params['U']=model.fc1.weight.detach().numpy().T
