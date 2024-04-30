@@ -574,14 +574,14 @@ class SCA(object):
         total_losses[0]=before_train.item()
 
 
-        dropout_rate = .5
+        dropout_rate = .2
         cd_dropout = CoordinatedDropout(dropout_rate)
         update_frequency = int(1/dropout_rate)
         print("DROPOUT: ", dropout_rate)
         model.train()
-        optimizer.zero_grad()
+        # optimizer.zero_grad()
         for epoch in tqdm(range(self.n_epochs), position=0, leave=True):
-            
+            optimizer.zero_grad()
             # Forward pass
             X_dropout = cd_dropout.process_data(X_torch)
             latent, y_pred = model(X_dropout)
@@ -601,10 +601,10 @@ class SCA(object):
 
             # Backward pass
             loss.backward()
-            # optimizer.step()
-            if (epoch+1) % update_frequency == 0 or epoch == self.n_epochs-1:
-                optimizer.step()
-                optimizer.zero_grad()
+            optimizer.step()
+            # if (epoch+1) % update_frequency == 0 or epoch == self.n_epochs-1:
+            #     optimizer.step()
+            #     optimizer.zero_grad()
             if self.scheduler_params['use_scheduler']:
                 scheduler.step(loss.item())
         # print('time',time.time()-t1)
