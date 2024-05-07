@@ -579,25 +579,28 @@ class SCA(object):
         update_frequency = int(1/dropout_rate)
         print("DROPOUT: ", dropout_rate)
         model.train()
-        # optimizer.zero_grad()
-        for epoch in tqdm(range(self.n_epochs), position=0, leave=True):
-            optimizer.zero_grad()
-            # Forward pass
-            X_dropout = cd_dropout.process_data(X_torch)
-            latent, y_pred = model(X_dropout)
-            
-            mask = cd_dropout.mask
-            mask = 1 - mask # we want to recover the withheld neurons - the ones that were zeroed before
-            mask = mask.bool()
+        
+        for epoch in tqdm(range(self.n_epochs//update_frequency), position=0, leave=True):
+            loss = 0
+            for _ in range(update_frequency): # 5 times with .2 dropout
 
-            # Compute Loss
-            if self.orth:
-                loss = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
-            else:
-                loss = my_loss_norm(y_pred*mask, Y_torch*mask, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
-                loss_total = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
+                optimizer.zero_grad()
+                # Forward pass
+                X_dropout = cd_dropout.process_data(X_torch)
+                latent, y_pred = model(X_dropout)
+                
+                withheld_mask = 1 - cd_dropout.mask # we want to recover the withheld neurons - the ones that were zeroed before
+                withheld_mask = withheld_mask.bool()
+
+                # Compute Loss
+                if self.orth:
+                    loss = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
+                else:
+                    loss += my_loss_norm(y_pred*withheld_mask, Y_torch*withheld_mask, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
+                    loss_total = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
+                total_losses[epoch+1]=loss_total.item() #overwrites epoch+1 5 times rn
+                # print(loss)
             losses[epoch+1]=loss.item()
-            total_losses[epoch+1]=loss_total.item()
 
             # Backward pass
             loss.backward()
