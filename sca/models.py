@@ -574,7 +574,7 @@ class SCA(object):
         total_losses[0]=before_train.item()
 
 
-        dropout_rate = .2
+        dropout_rate = .4
         cd_dropout = CoordinatedDropout(dropout_rate)
         update_frequency = int(1/dropout_rate)
         print("DROPOUT: ", dropout_rate)
@@ -582,15 +582,19 @@ class SCA(object):
         
         for epoch in tqdm(range(self.n_epochs//update_frequency), position=0, leave=True):
             loss = 0
-            for _ in range(update_frequency): # 5 times with .2 dropout
+            cd_dropout.make_partition(X_torch)
+            for _ in range(len(cd_dropout.partitions)): # 5 times with .2 dropout
 
                 optimizer.zero_grad()
                 # Forward pass
-                X_dropout = cd_dropout.process_data(X_torch)
+                # X_dropout = cd_dropout.process_data(X_torch)
+                X_dropout = cd_dropout.partitions.pop()
                 latent, y_pred = model(X_dropout)
                 
-                withheld_mask = 1 - cd_dropout.mask # we want to recover the withheld neurons - the ones that were zeroed before
-                withheld_mask = withheld_mask.bool()
+                # mask = X_dropout.bool()
+                # withheld_mask = 1 - mask # we want to recover the withheld neurons - the ones that were zeroed before
+                # withheld_mask = withheld_mask.bool()
+                withheld_mask = X_dropout == 0
 
                 # Compute Loss
                 if self.orth:
@@ -600,6 +604,7 @@ class SCA(object):
                     loss_total = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
                 total_losses[epoch+1]=loss_total.item() #overwrites epoch+1 5 times rn
                 # print(loss)
+            cd_dropout.reset()
             losses[epoch+1]=loss.item()
 
             # Backward pass
