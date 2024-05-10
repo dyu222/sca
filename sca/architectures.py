@@ -141,8 +141,8 @@ class LowRNorm(nn.Module):
             self._gauss(
                 self._x_vals,
                 0,
-                # 1).reshape(1,1,-1)
-                self.sigmas[j]).reshape(1,1,-1)
+                1).reshape(1,1,-1)
+                # self.sigmas[j]).reshape(1,1,-1)
                 # 1+torch.nn.functional.softplus(self.sigmas[j])).reshape(1,1,-1)
             for j in range(self.hidden_size)
         ]

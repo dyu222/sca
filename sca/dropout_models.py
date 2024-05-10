@@ -606,6 +606,7 @@ class SCA(object):
                 mask = cd_dropout.mask
                 mask = 1 - mask # we want to recover the withheld neurons - the ones that were zeroed before
                 mask = mask.bool()
+                mask = mask[adj_idxs]
                 # loss = my_loss_norm_poiss(y_pred[mask], Y_torch[mask], latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
                 loss = my_loss_norm_poiss(y_pred*mask, Y_torch*mask, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
                 # loss = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)

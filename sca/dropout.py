@@ -21,7 +21,8 @@ class CoordinatedDropout:
     def process_data(self, data):
         # Sample a new CD mask at each training step
         device = data.device
-        cd_mask = self.cd_input_dist.sample((data.shape[1],))
+        # cd_mask = self.cd_input_dist.sample((data.shape[1],))
+        cd_mask = self.cd_input_dist.sample(data.shape)
         # Store the grad_mask for later
         self.mask = cd_mask
         # Mask and scale post-CD input so it has the same sum as the original data
