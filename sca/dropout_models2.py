@@ -565,14 +565,14 @@ class SCA(object):
 
         #Get initial model loss before training
         model.eval()
-        latent, y_pred = model(X_torch)
+        latent, latent_post_filter, y_pred = model(X_torch)
 
         diff = len(Y_torch) - len(y_pred)
         adj_idxs = range(diff//2, len(Y_torch) - math.ceil(diff/2))
         Y_torch = Y_torch[adj_idxs]
         
         if self.poisson:
-            before_train = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
+            before_train = my_loss_norm_poiss(y_pred, Y_torch, latent_post_filter, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
         else:
             if self.orth:
                 before_train = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
@@ -604,21 +604,21 @@ class SCA(object):
                 optimizer.zero_grad()
                 # Forward pass
                 X_dropout = cd_dropout.partitions.pop()
-                latent, y_pred = model(X_dropout)
+                latent, latent_post_filter, y_pred = model(X_dropout)
                 withheld_mask = X_dropout == 0
                 withheld_mask = withheld_mask[adj_idxs]
 
                 # Compute Loss
                 if self.poisson:
                     # update Y_pred and Y_torch to be the the values of the held out latents
-                    loss += my_loss_norm_poiss(y_pred*withheld_mask, Y_torch*withheld_mask, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
+                    loss += my_loss_norm_poiss(y_pred*withheld_mask, Y_torch*withheld_mask, latent_post_filter, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
                     # loss_total += my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
                 else:
                     if self.orth:
                         loss = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
                     else:
                         loss = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
-            loss_total = my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
+            loss_total = my_loss_norm_poiss(y_pred, Y_torch, latent_post_filter, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
             cd_dropout.reset()
             losses[epoch+1]=loss.item()
             total_losses[epoch+1]=loss_total.item()
@@ -630,7 +630,7 @@ class SCA(object):
             if self.scheduler_params['use_scheduler']:
                 scheduler.step(loss.item())
         # print('time',time.time()-t1)
-        latent, y_pred = model(X_torch)
+        latent, latent_post_filter, y_pred = model(X_torch)
         print("final sigmas: ", model.sigmas)
         print("final loss sigmas: ", model.loss_sigmas)
         # Include attributes as part of self
@@ -654,7 +654,8 @@ class SCA(object):
         sq_activity=[np.sum((latent[:,i:i+1].detach().numpy()@model.fc2.weight[:,i:i+1].detach().numpy().T)**2) for i in range(self.n_components)]
         self.explained_squared_activity = np.array(sq_activity)
 
-        return latent.detach().numpy()
+        # return latent.detach().numpy()
+        return latent_post_filter.detach().numpy()
 
 
 

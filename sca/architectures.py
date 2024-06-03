@@ -141,8 +141,8 @@ class LowRNorm(nn.Module):
             self._gauss(
                 self._x_vals,
                 0,
-                1).reshape(1,1,-1)
-                # self.sigmas[j]).reshape(1,1,-1)
+                # 1).reshape(1,1,-1)
+                self.sigmas[j]).reshape(1,1,-1)
                 # 1+torch.nn.functional.softplus(self.sigmas[j])).reshape(1,1,-1)
             for j in range(self.hidden_size)
         ]
@@ -184,7 +184,7 @@ class LowRNorm(nn.Module):
         z_post_filter = self.apply_filters(f, z_pre_filter)
         X_hat = self.fc2(z_post_filter)
         X_hat_pos = torch.nn.functional.softplus(X_hat)
-        return z_pre_filter, X_hat_pos
+        return z_pre_filter, z_post_filter, X_hat_pos
 
 
         # after we get the convolutions to work, we will need to trim target size in loss function so target and prediction sizes are the same
