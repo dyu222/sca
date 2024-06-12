@@ -584,44 +584,62 @@ class SCA(object):
         # t1=time.time()
         losses=np.zeros(self.n_epochs+1) #Save loss at each training epoch
         total_losses=np.zeros(self.n_epochs+1) #Save loss at each training epoch
-        # TODO: update the first one as well
-        dropout_rate = 0.15
+        
         losses[0]=before_train.item()
         total_losses[0]=before_train.item()
 
-        cd_dropout = CoordinatedDropout(dropout_rate)
-        update_frequency = int(1/dropout_rate)
-        print("DROPOUT: ", dropout_rate)
+        
+        dropout_rate = 0.15 # make this an input parameter?
+        # dropout_rate = 0 # make this an input parameter?
+        if dropout_rate:
+            cd_dropout = CoordinatedDropout(dropout_rate)
+            print("DROPOUT: ", dropout_rate)
 
         model.train()
+        rows, cols = X_torch.shape
 
         # for epoch in tqdm(range(self.n_epochs//update_frequency), position=0, leave=True):
         for epoch in tqdm(range(self.n_epochs), position=0, leave=True):
-            loss = 0
-            cd_dropout.make_partition(X_torch)
+            optimizer.zero_grad()
+            if dropout_rate:
+                loss = 0
+                cd_dropout.make_partition(rows, cols)
+                for _ in range(len(cd_dropout.partitions)): 
+                    optimizer.zero_grad()
+                    # Forward pass
+                    # X_dropout = cd_dropout.partitions.pop()
+                    # latent, latent_post_filter, y_pred = model(X_dropout)
+                    # withheld_mask = X_dropout == 0
+                    # withheld_mask = withheld_mask[adj_idxs]
+                    mask, rate = cd_dropout.partitions.pop() # rate is 1-dropout_rate to normalize the data
+                    masked_data = (X_torch*mask)/rate
+                    # masked_data = (X_torch*mask)/rate
+                    latent, latent_post_filter, y_pred = model(masked_data)
+                    withheld_mask = 1-mask[adj_idxs]
 
-            for _ in range(len(cd_dropout.partitions)): # 5 times with .2 dropout
-                optimizer.zero_grad()
-                # Forward pass
-                X_dropout = cd_dropout.partitions.pop()
-                latent, latent_post_filter, y_pred = model(X_dropout)
-                withheld_mask = X_dropout == 0
-                withheld_mask = withheld_mask[adj_idxs]
-
-                # Compute Loss
+                    # Compute Loss
+                    if self.poisson:
+                        # update Y_pred and Y_torch to be the the values of the held out latents
+                        loss += my_loss_norm_poiss(y_pred*withheld_mask, Y_torch*withheld_mask, latent_post_filter, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
+                        # loss_total += my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
+                    else:
+                        if self.orth:
+                            loss = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
+                        else:
+                            loss = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
+                loss_total = my_loss_norm_poiss(y_pred, Y_torch, latent_post_filter, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
+                cd_dropout.reset()
+            else:
+                latent, latent_post_filter, y_pred = model(X_torch)
                 if self.poisson:
-                    # update Y_pred and Y_torch to be the the values of the held out latents
-                    loss += my_loss_norm_poiss(y_pred*withheld_mask, Y_torch*withheld_mask, latent_post_filter, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
-                    # loss_total += my_loss_norm_poiss(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
+                        loss = my_loss_norm_poiss(y_pred, Y_torch, latent_post_filter, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
                 else:
                     if self.orth:
                         loss = my_loss(y_pred, Y_torch, latent, self.lam_sparse, sample_weight_torch)
                     else:
                         loss = my_loss_norm(y_pred, Y_torch, latent, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch)
-            loss_total = my_loss_norm_poiss(y_pred, Y_torch, latent_post_filter, model.fc2.weight, self.lam_sparse, self.lam_orthog, sample_weight_torch, model.loss_sigmas, self.lam_loss)
-            cd_dropout.reset()
             losses[epoch+1]=loss.item()
-            total_losses[epoch+1]=loss_total.item()
+            # total_losses[epoch+1]=loss_total.item()
 
             # Backward pass
             loss.backward()
