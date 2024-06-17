@@ -23,7 +23,7 @@ from sca.loss_funcs import my_loss, my_loss_norm, my_loss_norm_poiss
 from sca.architectures import LowROrth, LowRNorm
 
 # from sca.dropout import CoordinatedDropout
-from sca.dropout2 import CoordinatedDropoutPartition
+from sca.dropout_partition import CoordinatedDropoutPartition
 
 from tqdm import tqdm
 
