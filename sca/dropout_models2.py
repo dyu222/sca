@@ -23,7 +23,7 @@ from sca.loss_funcs import my_loss, my_loss_norm, my_loss_norm_poiss
 from sca.architectures import LowROrth, LowRNorm
 
 # from sca.dropout import CoordinatedDropout
-from sca.dropout2 import CoordinatedDropout
+from sca.dropout2 import CoordinatedDropoutPartition
 
 from tqdm import tqdm
 
@@ -592,7 +592,7 @@ class SCA(object):
         dropout_rate = 0.15 # make this an input parameter?
         # dropout_rate = 0 # make this an input parameter?
         if dropout_rate:
-            cd_dropout = CoordinatedDropout(dropout_rate)
+            cd_dropout = CoordinatedDropoutPartition(dropout_rate)
             print("DROPOUT: ", dropout_rate)
 
         model.train()
@@ -600,12 +600,12 @@ class SCA(object):
 
         # for epoch in tqdm(range(self.n_epochs//update_frequency), position=0, leave=True):
         for epoch in tqdm(range(self.n_epochs), position=0, leave=True):
-            optimizer.zero_grad()
+            # optimizer.zero_grad(set_to_none=True)
             if dropout_rate:
                 loss = 0
                 cd_dropout.make_partition(rows, cols)
                 for _ in range(len(cd_dropout.partitions)): 
-                    optimizer.zero_grad()
+                    optimizer.zero_grad(set_to_none=True)
                     # Forward pass
                     # X_dropout = cd_dropout.partitions.pop()
                     # latent, latent_post_filter, y_pred = model(X_dropout)
@@ -615,7 +615,7 @@ class SCA(object):
                     masked_data = (X_torch*mask)/rate
                     # masked_data = (X_torch*mask)/rate
                     latent, latent_post_filter, y_pred = model(masked_data)
-                    withheld_mask = 1-mask[adj_idxs]
+                    withheld_mask = (1-mask).bool()[adj_idxs] # is the bool necessary/faster or slower?
 
                     # Compute Loss
                     if self.poisson:
